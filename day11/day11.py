@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 import multiprocessing as mp
@@ -6,6 +7,8 @@ GRID_SERIAL_NUMBER = 9005
 FUEL_GRID_TOTAL_SIZE = 300
 FUEL_GRID_SIZE = 3
 PROGRESS_BAR_LENGTH = int(FUEL_GRID_TOTAL_SIZE / 4)
+
+base_file = os.path.splitext(__file__)[0]
 
 power_grid = [[0 for x in range(FUEL_GRID_TOTAL_SIZE + 1)] for y in range(FUEL_GRID_TOTAL_SIZE + 1)]
 
@@ -62,21 +65,36 @@ print("Searching for optimal grid size ...")
 pool = mp.Pool() # default uses multiprocessing.cpu_count()
 start_time = time.time()
 best_results = (0,)
+worse_results = 0
 completed_calculations = 0
 
 results = [pool.apply_async(search_highest_grid_power, args=(grid_size,)) for grid_size in range(1, FUEL_GRID_TOTAL_SIZE)]
+
+fo = open(base_file + ".output", "w")
 
 for result in results:
 	power, coordinates, size = result.get()
 
 	if best_results[0] < power:
 		best_results = (power, coordinates, size)
+		worse_results = 0
+	else:
+		worse_results +=1
+
+	fo.write("Size %2u, power %3d\n" % (size, power))
 
 	status = "Best power %3u starting @ (%3u, %3u) with size %d/%d" % (best_results[0], best_results[1][0], best_results[1][1], best_results[2], size)
 	completed_calculations = completed_calculations + size * size * 1.0 * (FUEL_GRID_TOTAL_SIZE - size + 1) * (FUEL_GRID_TOTAL_SIZE - size + 1)
 	show_progress(completed_calculations / total_calculations, time.time() - start_time, status)
 
+	if worse_results > 5:
+		pool.terminate()
+		print()
+		break
+
 else:
 	print()
+
+fo.close()
 
 print("X,Y,size of square with the largest total power (%u) is %u,%u,%u" % (best_results[0], best_results[1][0], best_results[1][1], best_results[2]))
