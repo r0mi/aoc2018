@@ -1,4 +1,6 @@
 import os
+import time
+s = time.time()
 
 base_file = os.path.splitext(__file__)[0]
 
@@ -11,20 +13,16 @@ with open(base_file + ".input", "r") as fo:
 print("Resulting frequency", sum(frequency_changes))
 
 duplicate_frequency_found = False
-iteration = 0
 running_frequency = 0
-frequencies = [running_frequency, ]
+frequency_dict = {0: 0}
 
 while not duplicate_frequency_found:
-     iteration = iteration + 1
-     print(".", end='', flush=True)
-     for frequency_change in frequency_changes:
-            running_frequency = running_frequency + frequency_change
-            if running_frequency not in frequencies:
-                frequencies.append(running_frequency)
-            else:
-                duplicate_frequency_found = True
-                print("")
-                break
+    for f in frequency_changes:
+        running_frequency += f
+        if running_frequency in frequency_dict:
+            duplicate_frequency_found = True
+            break
+        else:
+            frequency_dict[running_frequency] = 0
 
 print("First frequency reached twice is", running_frequency)
