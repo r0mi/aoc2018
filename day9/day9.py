@@ -1,5 +1,6 @@
 import sys
 import time
+from collections import deque
 
 NUM_PLAYERS = 459
 MARBLES = 71320
@@ -11,43 +12,42 @@ def show_progress(progress, duration):
 	sys.stdout.write("\r[{0}] {1:3d}% | {2}".format( "#" * blocks + "-" * (PROGRESS_BAR_LENGTH - blocks), round(progress * 100), "%2u:%02u" % (duration / 60, duration % 60)))
 	sys.stdout.flush()
 
-def take_turn(circle, marble, index):
-	points = 0
-	if marble % 23:
-		index = index + 2
-
-		if len(circle) == 1:
-			index = 1
-			circle.append(marble)
-
-		elif index == len(circle):
-			circle.append(marble)
-
-		else:
-			index = index % len(circle)
-			circle.insert(index, marble)
-
-	else:
-		points = points + marble
-		index = index - 7
-		points = points + circle.pop(index)
-
-		if index < 0:
-			index = index + 1 % len(circle)
-
-	return (circle, index, points)
 
 def play(marbles):
 	current_idx = 0
-	circle = [0]
+	circle = deque([0], maxlen=marbles)
 	players = [0 for x in range(NUM_PLAYERS)]
 	marble = 1
 	player = 0
 	start_time = time.time()
+	length = 1
 
 	while marble <= marbles:
-		circle, current_idx, points = take_turn(circle, marble, current_idx)
-		players[player] = players[player] + points
+		points = 0
+
+		if marble % 23:
+			current_idx += 2
+
+			if current_idx == length:
+				circle.append(marble)
+
+			else:
+				current_idx = current_idx % length
+				circle.rotate(length - current_idx)
+				circle.append(marble)
+				current_idx = length
+
+			length += 1
+		else:
+			points = points + marble
+			circle.rotate(-(current_idx - 7))
+			points = points + circle.popleft()
+			current_idx = 0
+			length -= 1
+
+		if points:
+			players[player] = players[player] + points
+
 		marble = marble + 1
 		player = (player + 1) % NUM_PLAYERS
 
