@@ -1,9 +1,7 @@
 import os
-import sys
 import time
 from copy import copy, deepcopy
-from functools import reduce
-import random
+from math import floor
 
 HEALTH_POINTS = 200
 ATTACK_POWER = 3
@@ -15,6 +13,12 @@ creatures = []
 creature_types = "GE"
 creature_locations = dict()
 
+row_num = [-1, 0, 0, 1]
+col_num = [0, -1, 1, 0]
+
+MAP_WIDTH = 0
+MAP_HEIGHT = 0
+
 class Cell:
 	def __init__(self, x, y):
 		self.x = x
@@ -25,14 +29,15 @@ class Cell:
 
 
 class Creature:
-	def __init__(self, type_, cell, hp):
+	def __init__(self, type_, cell, hp, attack_power):
 		self.type = type_
 		self.location = cell
 		self.hp = hp
 		self.enemy = creature_types.strip(type_)
+		self.attack_power = attack_power
 
 	def attack(self, target):
-		target.hp -= ATTACK_POWER
+		target.hp -= self.attack_power
 		return target.hp > 0
 
 	def dead(self):
@@ -51,22 +56,32 @@ class Node:
 		return "(%u,%u)=%u" % (self.cell.x, self.cell.y, self.distance)
 
 
-with open(base_file + ".input", "r") as fo:
-	for y, line in enumerate(fo):
-		row = []
-		for x, cell in enumerate(line.rstrip()):
-			row.append(cell);
-			if cell in creature_types:
-				creature = Creature(cell, Cell(x, y), HEALTH_POINTS)
-				creatures.append(creature)
-				creature_locations[(x,y)] = creature
-		cave_map.append(row)
+def load_initial_data(cave_map, creatures, creature_locations, attack_power):
+	cave_map.clear()
+	creatures.clear()
+	creature_locations.clear()
 
-map_width = len(cave_map[0])
-map_height = len(cave_map)
+	with open(base_file + ".input", "r") as fo:
+		for y, line in enumerate(fo):
+			row = []
 
-row_num = [-1, 0, 0, 1]
-col_num = [0, -1, 1, 0]
+			for x, cell in enumerate(line.rstrip()):
+				row.append(cell);
+
+				if cell in creature_types:
+					if cell == "E":
+						creature = Creature(cell, Cell(x, y), HEALTH_POINTS, attack_power)
+
+					else:
+						creature = Creature(cell, Cell(x, y), HEALTH_POINTS, ATTACK_POWER)
+
+					creatures.append(creature)
+					creature_locations[(x,y)] = creature
+
+			cave_map.append(row)
+
+	return (len(cave_map[0]), len(cave_map))
+
 
 def sort_creatures(creatures):
 	creatures.sort(key=lambda creature: (creature.location.y, creature.location.x))
@@ -74,29 +89,27 @@ def sort_creatures(creatures):
 
 def print_map(round_):
 	os.system("clear")
-	print("Round #", round_, "creatures", len(creatures), len(creature_locations))
+	print("Round #", round_, "elves", len(list(filter(lambda c: c.type == "E", creatures))), " Goblins", len(list(filter(lambda c: c.type == "G", creatures))))
+
 	for y, row in enumerate(cave_map):
 		cs = []
+
 		for x, cell in enumerate(row):
 			print(cell, end='')
+
 			if (x,y) in creature_locations:
 				cs.append(creature_locations[(x,y)])
+
 		print("   " + ", ".join(list(map(str, cs))))
 
-def print_map_with_overlay(overlay_items, overlay_char='*'):
-	for y, row in enumerate(cave_map):
-		for x, cell in enumerate(row):
-			if (x,y) in overlay_items:
-				print(overlay_char, end='')
-			else:
-				print(cell, end='')
-		print()
 
 def find_targets(enemy, creatures):
 	return list(filter(lambda creature: creature.type == enemy and creature.hp > 0, creatures))
 
+
 def is_valid(col, row):
-	return col >= 0 and col < map_width and row >= 0 and row < map_height
+	return col >= 0 and col < MAP_WIDTH and row >= 0 and row < MAP_HEIGHT
+
 
 def enemy_in_range(attacker):
 	weakest = []
@@ -133,7 +146,7 @@ def in_range_spots(targets):
 
 
 def calc_distance_map(start):
-	distance_map = [[-1 for x in range(map_width)] for y in range(map_height)]
+	distance_map = [[-1 for x in range(MAP_WIDTH)] for y in range(MAP_HEIGHT)]
 	distance_map[start.y][start.x] = 0
 	next_distance = 0
 	queue = [start]
@@ -153,26 +166,13 @@ def calc_distance_map(start):
 					queue.append(cell)
 					distance_map[row][col] = next_distance
 
-	# first = True
-	# print("   ", end="")
-	# for i in range(len(distance_map[0])):
-	# 	print("%3d" % i, end="")
-	# print()
-	# for y, row in enumerate(distance_map):
-	# 	for x, cell in enumerate(row):
-	# 		if x == 0:
-	# 			print("%3d" % y, end="")
-	# 		if cell == -1:
-	# 			print(" . ", end='')
-	# 		else:
-	# 			print("%3d" % cell, end='')
-	# 	print()
 	return distance_map
+
 
 def find_next_step(start, end):
 	distance_map = calc_distance_map(start)
 
-	best = map_width * map_height
+	best = MAP_WIDTH * MAP_HEIGHT
 	step = None
 
 	for i in range(4):
@@ -214,11 +214,13 @@ def move(creature, targets):
 		if distance_map[p.y][p.x] > 0 and (shortest == None or distance_map[p.y][p.x] < shortest):
 			shortest = distance_map[p.y][p.x]
 			closest = [p]
+
 		elif distance_map[p.y][p.x] == shortest:
 			closest.append(p)
 
 	if shortest:
 		nearest = sorted(closest, key=lambda c: (c.y, c.x))[0]
+
 	else:
 		nearest = None
 
@@ -236,6 +238,7 @@ def proceed_round(round_nr):
 		if (cr.location.x, cr.location.y) not in creature_locations:
 			# Creature has died
 			continue
+
 		else:
 			creature = creature_locations[(cr.location.x, cr.location.y)]
 
@@ -258,15 +261,16 @@ def proceed_round(round_nr):
 			creature.location.y = step.y
 			c = creature_locations.pop((loc.x, loc.y), None)
 			creature_locations[(step.x, step.y)] = c
-
 			attack(creature)
 
 	return True
 
 
-def combat():
+def combat(cave_map, creatures, creature_locations):
 	iteration = 0
 	print_map(iteration)
+
+	elves = len(list(filter(lambda c: c.type == "E", creatures)))
 
 	while proceed_round(iteration):
 		iteration += 1
@@ -274,7 +278,46 @@ def combat():
 		sort_creatures(creatures)
 
 	print_map(iteration - 1)
-	print("Total score after %d iterations" % (iteration - 1), (iteration - 1) * sum(map(lambda c: c.hp, creatures)))
-	return
+	score = (iteration - 1) * sum(map(lambda c: c.hp, creatures))
 
-combat()
+	return (score, iteration - 1, elves - len(list(filter(lambda c: c.type == "E", creatures))))
+
+
+MAP_WIDTH, MAP_HEIGHT = load_initial_data(cave_map, creatures, creature_locations, ATTACK_POWER)
+
+initial_score, iterations, elves_died = combat(cave_map, creatures, creature_locations)
+
+minimum_attack_power = ATTACK_POWER
+maximum_attack_power = minimum_attack_power * 2
+test_attack_power = maximum_attack_power
+tested_attack_power = {ATTACK_POWER: initial_score}
+upper_bound_found = False
+
+while True:
+	load_initial_data(cave_map, creatures, creature_locations, test_attack_power)
+
+	score, iterations, elves_died = combat(cave_map, creatures, creature_locations)
+	print("With attack power %d %d elves die, total score after %d iterations %d" % (test_attack_power, elves_died, iterations, score))
+
+	tested_attack_power[test_attack_power] = score
+
+	if elves_died:
+		if not upper_bound_found:
+			minimum_attack_power = test_attack_power
+			maximum_attack_power = minimum_attack_power * 2
+			test_attack_power = maximum_attack_power
+
+		else:
+			minimum_attack_power = test_attack_power
+			test_attack_power = int(floor((maximum_attack_power + minimum_attack_power) / 2. + 0.5))
+
+	elif elves_died == 0:
+		upper_bound_found = True
+		maximum_attack_power = test_attack_power
+		test_attack_power = (floor((maximum_attack_power + minimum_attack_power) / 2. + 0.5))
+
+	if test_attack_power in tested_attack_power:
+		os.system("clear")
+		print("Initial score with attack power of %d is %d" % (ATTACK_POWER, tested_attack_power[ATTACK_POWER]))
+		print("With attack power of %d, elves barely win with score %d" % (test_attack_power, tested_attack_power[test_attack_power]))
+		break
