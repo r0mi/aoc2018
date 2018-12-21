@@ -126,7 +126,7 @@ def find_overflow_points(point, u_map):
 			break
 
 		elif u_map[Y][x] == moving_water and u_map[Y + 1][x] == moving_water:
-			left = None
+			left = (x, False)
 			break
 
 		elif u_map[Y + 1][x] == sand:
@@ -143,7 +143,7 @@ def find_overflow_points(point, u_map):
 			break
 
 		elif u_map[Y][x] == moving_water and u_map[Y + 1][x] == moving_water:
-			right = None
+			right = (x, False)
 			break
 
 		elif u_map[Y + 1][x] == sand:
